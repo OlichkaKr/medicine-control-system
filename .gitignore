@@ -129,6 +129,6 @@ dmypy.json
 .pyre/
 
 /env
-migrations/
 /.idea
 conf.py
+.env

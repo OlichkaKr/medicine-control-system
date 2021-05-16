@@ -1,0 +1,1 @@
+web: gunicorn --pythonpath medicinecontrolsystem medicinecontrolsystem.wsgi --log-file -
