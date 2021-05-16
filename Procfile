@@ -1,1 +1,1 @@
-web: gunicorn medicinecontrolsystem.wsgi --log-file -
+web: gunicorn --pythonpath medicinecontrolsystem medicinecontrolsystem.wsgi --log-file -
