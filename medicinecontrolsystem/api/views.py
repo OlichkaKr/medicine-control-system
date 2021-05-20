@@ -75,6 +75,8 @@ class SensorView(ModelViewSet):
     serializer_class = SensorSerializer
 
     def retrieve(self, request, *args, **kwargs):
+        if not request.user.id:
+            return Response({"detail": "Authentication credentials were not provided."})
         if kwargs.get('pk') and kwargs.get('pk') == str(request.user.id):
             return super().retrieve(request, args, kwargs)
         else:
