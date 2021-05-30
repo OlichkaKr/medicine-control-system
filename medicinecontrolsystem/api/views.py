@@ -40,9 +40,12 @@ class SensorDataView(ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         if kwargs.get('nested_1_pk') and kwargs.get('nested_1_pk') == str(request.user.id):
-            request.data._mutable = True
-            request.data.update({'sensor': str(request.user.id)})
-            request.data._mutable = False
+            if isinstance(request.data, dict):
+                request.data.update({'sensor': str(request.user.id)})
+            else:
+                request.data._mutable = True
+                request.data.update({'sensor': str(request.user.id)})
+                request.data._mutable = False
             return super().create(request, args, kwargs)
 
         return Response({"error": "Sensor can not change data of another sensor."})
@@ -51,9 +54,12 @@ class SensorDataView(ModelViewSet):
         if kwargs.get('nested_1_pk') and kwargs.get('nested_1_pk') == str(request.user.id):
             instance = self.get_object()
             if instance.sensor_id and instance.sensor_id == request.user.id:
-                request.data._mutable = True
-                request.data.update({'sensor': str(request.user.id)})
-                request.data._mutable = False
+                if isinstance(request.data, dict):
+                    request.data.update({'sensor': str(request.user.id)})
+                else:
+                    request.data._mutable = True
+                    request.data.update({'sensor': str(request.user.id)})
+                    request.data._mutable = False
                 return super().update(request, args, kwargs)
 
         return Response({"error": "Sensor can not change data of another sensor."})
