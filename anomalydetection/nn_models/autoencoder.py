@@ -1,96 +1,46 @@
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 import numpy as np
+from keras import callbacks
 from keras.layers import LSTM, Dense, RepeatVector, TimeDistributed, Dropout
 from keras.models import Sequential
-from matplotlib import pyplot as plt
-
-train = pd.read_csv('../train_dataset.csv', names=['value', 'datetime'])
-test = pd.read_csv('../test_dataset_outliers.csv', names=['value', 'datetime'])
-# train, test = train_test_split(df, train_size=80 / 100)
-
-print(train.shape, test.shape)
-scaler = StandardScaler()
-# scaler = scaler.fit(train[['value']])
-
-train['value'] = scaler.fit_transform(train[['value']])
-test['value'] = scaler.transform(test[['value']])
-# print(train['value'].head())
 
 
+class LSTM_NN():
+    def __init__(self, optimizer='adam', loss='mae'):
+        self.optimizer = optimizer
+        self.loss = loss
+        self.timesteps = 1
+        self.n_features = 1
+        self.model = None
 
-TIME_STEPS = 30
+    def create_model(self):
+        model = Sequential()
 
-def create_sequences(X, y, time_steps=TIME_STEPS):
-    Xs, ys = [], []
-    for i in range(len(X) - time_steps):
-        Xs.append(X.iloc[i:(i + time_steps)].values)
-        ys.append(y.iloc[i + time_steps])
+        model.add(LSTM(128, input_shape=(self.timesteps, self.n_features)))
+        model.add(Dropout(rate=0.2))
+        model.add(RepeatVector(self.timesteps))
+        model.add(LSTM(128, return_sequences=True))
+        model.add(Dropout(rate=0.2))
+        model.add(TimeDistributed(Dense(self.n_features)))
+        model.compile(optimizer=self.optimizer, loss=self.loss)
+        model.summary()
 
-    return np.array(Xs), np.array(ys)
+        self.model = model
 
+    def fit(self, x, y, epochs=100, batch_size=32, validation_split=0.1):
+        self.timesteps = x.shape[1]
+        self.n_features = x.shape[2]
+        self.create_model()
 
-X_train, y_train = create_sequences(train[['value']], train['value'])
-X_test, y_test = create_sequences(test[['value']], test['value'])
+        self.model.fit(x, y, epochs=epochs, batch_size=batch_size, validation_split=validation_split,
+                       callbacks=[callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')], shuffle=False)
 
-print(f'Training shape: {X_train.shape}')
+    def evaluate(self, x, y):
+        self.model.evaluate(x, y)
 
-print(f'Testing shape: {X_test.shape}')
+    def predict(self, x, verbose=0):
+        return self.model.predict(x, verbose=verbose)
 
-model = Sequential()
-model.add(LSTM(128, input_shape=(X_train.shape[1], X_train.shape[2])))
-model.add(Dropout(rate=0.2))
-model.add(RepeatVector(X_train.shape[1]))
-model.add(LSTM(128, return_sequences=True))
-model.add(Dropout(rate=0.2))
-model.add(TimeDistributed(Dense(X_train.shape[2])))
-model.compile(optimizer='adam', loss='mae')
-model.summary()
-
-from keras import callbacks
-history = model.fit(X_train, y_train, epochs=100, batch_size=32, validation_split=0.1,
-                    callbacks=[callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')], shuffle=False)
-
-plt.plot(history.history['loss'], label='Training loss')
-plt.plot(history.history['val_loss'], label='Validation loss')
-plt.show()
-
-model.evaluate(X_test, y_test)
-
-X_train_pred = model.predict(X_train, verbose=0)
-train_mae_loss = np.mean(np.abs(X_train_pred - X_train), axis=1)
-
-plt.hist(train_mae_loss, bins=50)
-plt.xlabel('Train MAE loss')
-plt.ylabel('Number of Samples')
-
-threshold = np.max(train_mae_loss)
-print(f'Reconstruction error threshold: {threshold}')
-
-X_test_pred = model.predict(X_test, verbose=0)
-test_mae_loss = np.mean(np.abs(X_test_pred-X_test), axis=1)
-
-plt.hist(test_mae_loss, bins=50)
-plt.xlabel('Test MAE loss')
-plt.ylabel('Number of samples')
-
-test_score_df = pd.DataFrame(test[TIME_STEPS:])
-test_score_df['loss'] = test_mae_loss
-test_score_df['threshold'] = threshold
-test_score_df['anomaly'] = test_score_df['loss'] > test_score_df['threshold']
-test_score_df['value'] = test[TIME_STEPS:]['value']
-
-plt.figure(figsize=(25, 3))
-plt.scatter(x=test_score_df['datetime'], y=test_score_df['loss'])
-plt.scatter(x=test_score_df['datetime'], y=test_score_df['threshold'])
-plt.show()
-
-anomalies = test_score_df.loc[test_score_df['anomaly'] == True]
-anomalies.head()
-
-plt.figure(figsize=(50, 3))
-plt.scatter(x=test_score_df['datetime'], y=scaler.inverse_transform(test_score_df['value']))
-plt.scatter(x=anomalies['datetime'], y=scaler.inverse_transform(anomalies['value']), c='r')
-plt.show()
-
+    def find_threshold(self, x_train):
+        x_train_pred = self.predict(x_train)
+        train_mae_loss = np.mean(np.abs(x_train_pred - x_train), axis=1)
+        return np.max(train_mae_loss)

@@ -33,11 +33,10 @@ class Generator:
 
     def generate_outliers(self, multiplier, value):
         # 10000 = (range/2)**2
-        a = -1*multiplier/((self.range_outliers/2)**2)
+        a = -1 * multiplier / ((self.range_outliers / 2) ** 2)
         b = -self.range_outliers * a
-        y = a*(value**2) + b*value + self.start
+        y = a * (value ** 2) + b * value + self.start
         return random.uniform(y - 0.4, y + 0.4)
-
 
     def generate_without_outliers(self, records, filename):
         now = datetime.datetime.now()
